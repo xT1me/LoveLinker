@@ -1,8 +1,8 @@
-import { Model } from "mongoose";
-import { CreateMessageDto } from "./dto/create-message.dto";
-import { Message } from "./schemas/message.schema";
-import { InjectModel } from "@nestjs/mongoose";
-import { Injectable } from "@nestjs/common";
+import { Model } from 'mongoose';
+import { CreateMessageDto } from './dto/create-message.dto';
+import { Message } from './schemas/message.schema';
+import { InjectModel } from '@nestjs/mongoose';
+import { Injectable } from '@nestjs/common';
 
 @Injectable()
 export class MessagesService {
@@ -26,7 +26,6 @@ export class MessagesService {
       { new: true }
     );
   }
-  
 
   async getChat(user1Id: string, user2Id: string): Promise<Message[]> {
     return this.messageModel
@@ -39,4 +38,3 @@ export class MessagesService {
       .sort({ timestamp: 1 });
   }
 }
-

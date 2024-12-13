@@ -1,7 +1,7 @@
 import { Controller, Post, Get, Body, Param, UseGuards, Patch } from '@nestjs/common';
 import { MessagesService } from './messages.service';
 import { CreateMessageDto } from './dto/create-message.dto';
-import { JwtAuthGuard } from 'src/auth/guards/auth.guard';
+import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 
 @Controller('messages')
 export class MessagesController {
@@ -21,7 +21,6 @@ export class MessagesController {
   async markAsRead(@Param('messageId') messageId: string) {
     return this.messagesService.markAsRead(messageId);
   }
-
 
   @UseGuards(JwtAuthGuard)
   @Post('chat')

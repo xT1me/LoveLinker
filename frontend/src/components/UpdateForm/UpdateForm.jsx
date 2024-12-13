@@ -44,11 +44,8 @@ const UpdateForm = ({
       return;
     }
 
-    try {
       await onSubmit(formData);
-    } catch (err) {
-      setError(err.message);
-    }
+
   };
 
 

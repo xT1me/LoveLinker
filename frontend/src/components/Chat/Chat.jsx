@@ -1,55 +1,127 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
+import { io } from "socket.io-client";
 import {
   Box,
   Typography,
   Paper,
   TextField,
   Button,
-  Stack,
 } from "@mui/material";
-import { getChat, markAsRead, sendMessage } from "../../api/messages/messages";
+import { useSelector } from "react-redux";
+import { getChat, markAsRead } from "../../api/messages/messages";
+import CheckIcon from "@mui/icons-material/Check"; 
 
-const Chat = ({ user1Id, user2Id, close }) => {
+const Chat = ({ user2Id }) => {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
+  const user = useSelector((state) => state.user.user);
+  const messagesEndRef = useRef(null);
+  const messageRefs = useRef([]);
+  const socketRef = useRef(null);
 
-  const handleSendMessage = async () => {
+  useEffect(() => {
+    socketRef.current = io("http://localhost:3003");
+
+    socketRef.current.emit("joinChat", { user1Id: user._id, user2Id });
+
+    socketRef.current.on("newMessage", (message) => {
+      setMessages((prevMessages) => [...prevMessages, message]);
+      scrollToUnreadMessage();
+    });
+
+    socketRef.current.on("messageRead", (messageId) => {
+      setMessages((prevMessages) =>
+        prevMessages.map((msg) =>
+          msg._id === messageId ? { ...msg, isRead: true } : msg
+        )
+      );
+    });
+
+    return () => {
+      if (socketRef.current) {
+        socketRef.current.off("newMessage");
+        socketRef.current.off("messageRead");
+        socketRef.current.disconnect();
+      }
+    };
+  }, [user._id, user2Id]);
+
+  useEffect(() => {
+    updateMessages();
+    scrollToUnreadMessage();
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            const messageId = entry.target.dataset.messageId;
+            const message = messages.find((msg) => msg._id === messageId);
+            if (message && !message.isRead && message.senderId !== user._id) {
+              handleMarkAsRead(messageId);
+            }
+          }
+        });
+      },
+      {
+        threshold: 0.5,
+      }
+    );
+
+    messageRefs.current.forEach((ref) => {
+      if (ref) {
+        observer.observe(ref);
+      }
+    });
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [messages]);
+
+  const handleSendMessage = () => {
     if (newMessage.trim()) {
-      await sendMessage({
-        senderId: user1Id,
+      socketRef.current.emit("sendMessage", {
+        senderId: user._id,
         receiverId: user2Id,
         content: newMessage,
       });
       setNewMessage("");
-      await updateMessages();
     }
   };
 
   const updateMessages = async () => {
-    const chatMessages = await getChat(user1Id, user2Id);
+    const chatMessages = await getChat(user._id, user2Id);
     setMessages(chatMessages);
   };
 
-  useEffect(() => {
-    updateMessages();
-    const interval = setInterval(updateMessages, 750);
-    return () => clearInterval(interval);
-  }, [user1Id, user2Id]);
+  const scrollToUnreadMessage = () => {
+    const firstUnreadMessage = messages.find((msg) => !msg.isRead);
 
-  const markMessagesAsRead = async () => {
-    const unreadMessages = messages.filter(
-      (msg) => !msg.isRead && msg.receiverId === user1Id
-    );
-    await Promise.all(unreadMessages.map((msg) => markAsRead(msg._id)));
+    if (firstUnreadMessage) {
+      const index = messages.findIndex((msg) => msg._id === firstUnreadMessage._id);
+      messageRefs.current[index]?.scrollIntoView({ behavior: "smooth" });
+    } else {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
   };
 
-  useEffect(() => {
-    markMessagesAsRead();
-  }, [messages]);
+  const handleMarkAsRead = async (messageId) => {
+    try {
+      await markAsRead(messageId);
+      setMessages((prevMessages) =>
+        prevMessages.map((msg) =>
+          msg._id === messageId ? { ...msg, isRead: true } : msg
+        )
+      );
+      socketRef.current.emit("markMessageAsRead", messageId);
+    } catch (error) {
+      console.error("Failed to mark message as read:", error);
+    }
+  };
 
   return (
     <>
-      <Typography variant="h5" textAlign="center" gutterBottom sx={{ color: "#333" }}>
+      <Typography variant="h5" textAlign="center" gutterBottom>
         Chat
       </Typography>
       <Box
@@ -62,54 +134,36 @@ const Chat = ({ user1Id, user2Id, close }) => {
           border: "1px solid",
           borderColor: "divider",
           borderRadius: 2,
-          bgcolor: "background.default",
           display: "flex",
           flexDirection: "column",
-          boxShadow: "0 4px 10px rgba(0, 0, 0, 0.1)",
         }}
       >
-        {messages.map((message) => (
+        {messages.map((message, index) => (
           <Paper
             key={message._id}
+            ref={(el) => (messageRefs.current[index] = el)}
+            data-message-id={message._id}
             sx={{
               p: 1.5,
               my: 1,
               maxWidth: "75%",
               alignSelf:
-                message.senderId === user1Id ? "flex-end" : "flex-start",
+                message.senderId === user._id ? "flex-end" : "flex-start",
               bgcolor:
-                message.senderId === user1Id ? "#FFA500" : "#E0E0E0",
-              color: "black",
-              borderRadius:
-                message.senderId === user1Id
-                  ? "16px 16px 0px 16px"
-                  : "16px 16px 16px 0px",
-              boxShadow: 2,
-              transition: "transform 0.2s",
-              "&:hover": {
-                transform: "scale(1.02)",
-              },
+                message.senderId === user._id ? "#FFA500" : "#E0E0E0",
             }}
           >
             <Typography variant="body1">{message.content}</Typography>
-            <Typography
-              variant="caption"
-              sx={{
-                display: "block",
-                textAlign: "right",
-                mt: 0.5,
-                color: "rgba(0, 0, 0, 0.6)",
-                fontWeight: 900,
-              }}
-            >
-              {new Date(message.timestamp).toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}{" "}
-              {message.isRead ? "✓✓" : "✓"}
-            </Typography>
+            <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
+              {message.isRead ? (
+                <CheckIcon color="primary" />
+              ) : (
+                <CheckIcon color="disabled" />
+              )}
+            </Box>
           </Paper>
         ))}
+        <div ref={messagesEndRef} />
       </Box>
       <Box
         sx={{
@@ -125,31 +179,8 @@ const Chat = ({ user1Id, user2Id, close }) => {
           placeholder="Type your message..."
           value={newMessage}
           onChange={(e) => setNewMessage(e.target.value)}
-          sx={{
-            "& .MuiOutlinedInput-root": {
-              borderRadius: 20,
-              backgroundColor: "#f5f5f5",
-            },
-            mr: 2,
-            input: {
-              padding: "10px",
-            },
-          }}
         />
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={handleSendMessage}
-          sx={{
-            borderRadius: 20,
-            px: 4,
-            alignSelf: "flex-end",
-            backgroundColor: "#f9a825",
-            "&:hover": {
-              backgroundColor: "#e68900",
-            },
-          }}
-        >
+        <Button variant="contained" color="primary" onClick={handleSendMessage}>
           Send
         </Button>
       </Box>

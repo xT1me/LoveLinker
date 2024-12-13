@@ -2,20 +2,22 @@ import React, { useEffect, useState } from "react";
 import Chat from "../Chat/Chat.jsx";
 import { getUsersList } from "../../api/users/users.js";
 import UserList from "../../UserList/UserList.jsx";
-import { Modal, Box, IconButton } from "@mui/material";
+import { Modal, Box, IconButton, Typography, Grid } from "@mui/material";
 import { Close } from "@mui/icons-material";
+import { useSelector } from "react-redux";
 
-const Main = ({ userId }) => {
+const Main = () => {
+  const user = useSelector(state => state.user.user);
   const [users, setUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
   const [isOpenChat, setOpenChat] = useState(false);
 
   useEffect(async () => {
-    if (userId) {
-        const users = await getUsersList(userId);
-        setUsers(users);
+    if (user._id) {
+      const users = await getUsersList(user._id);
+      setUsers(users);
     }
-  }, [userId]);
+  }, [user]);
 
   const handleOpenChat = (id) => {
     setSelectedUser(id);
@@ -29,8 +31,30 @@ const Main = ({ userId }) => {
 
   return (
     <div className="main-container">
-      <UserList users={users} openChat={handleOpenChat} />
-      
+      {users.length === 0 ? (
+        <Grid
+          container
+          justifyContent="center"
+          alignItems="center"
+          style={{ height: "100vh", textAlign: "center" }}
+        >
+          <Typography
+            variant="h5"
+            color="textSecondary"
+            style={{
+              fontWeight: "bold",
+              fontSize: "24px",
+              letterSpacing: "1px",
+              textTransform: "uppercase",
+            }}
+          >
+            No users found
+          </Typography>
+        </Grid>
+      ) : (
+        <UserList users={users} openChat={handleOpenChat} />
+      )}
+
       <Modal open={isOpenChat} onClose={closeChat}>
         <Box
           sx={{
@@ -61,7 +85,7 @@ const Main = ({ userId }) => {
           >
             <Close />
           </IconButton>
-          <Chat user1Id={userId} user2Id={selectedUser} close={closeChat} />
+          <Chat user2Id={selectedUser} close={closeChat} />
         </Box>
       </Modal>
     </div>

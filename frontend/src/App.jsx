@@ -8,56 +8,36 @@ import Main from './components/Main/Main.jsx';
 import AuthForm from './components/AuthForm/AuthForm.jsx';
 import { checkAuth, logout } from './api/auth/auth.js';
 import PrivateRoute from './routes/PrivateRoute.jsx';
+import { useDispatch, useSelector } from 'react-redux';
+import { userActions } from './redux/user/userActions.js';
 
 const App = () => {
-  const [isAuth, setAuth] = useState(null);
-  const [userId, setUserId] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const dispatch = useDispatch()
+  const userReducer = new userActions(dispatch)
 
-  const navigate = useNavigate();
+  const isAuthenticated = useSelector(state => state.user.isAuthenticated)
+  const user = useSelector(state => state.user.user)
 
-  const checkIsAuth = async () => {
-    try {
-      const userData = await checkAuth();
-      if (userData) {
-        setUserId(userData.id);
-        setAuth(true);
-        setUser(userData.user)
-      } else {
-        logoutAccount();
-      }
-    } catch (error) {
-      console.error(error);
-      setAuth(false)
-    }
-  };
-
-  const logoutAccount = () => {
-    logout();
-    setAuth(false);
-    setUser(null);
-    setUserId(null);
-  };
-
-  useEffect(() => {
-    checkIsAuth();
+  useEffect(async () => {
+    checkisAuthenticated()
   }, []);
 
+  const checkisAuthenticated = async () => {
+    try {
+      const authData = await checkAuth()
+      authData ? userReducer.setUser(authData.userId) : userReducer.logoutAccount()
+    } catch (error) {
+      console.error(error)
+    }
+  }
+ 
+
   useEffect(() => {
-    if (isAuth !== null) {
+    if (isAuthenticated !== null) {
       const timer = setTimeout(() => setLoading(false), 1000); 
     }
-  }, [isAuth]);
-
-  const onAuthSuccess = async (id, user) => {
-    setAuth(true);
-    setUserId(id);
-
-    setUser(user)
-
-    navigate('/');
-  };
+  }, [isAuthenticated]);
 
   if (loading) {
     return (
@@ -74,26 +54,18 @@ const App = () => {
 
   return (
     <div className="App">
-      {isAuth && user && (
-        <Header
-          isAuth={isAuth}
-          setAuth={setAuth}
-          setUserId={setUserId}
-          logoutAccount={logoutAccount}
-          setUser={setUser}
-          user={user}
-        />
-      )}
+
       <Routes>
         <Route
           path="/"
           element={
-            <PrivateRoute isAuth={isAuth}>
-              <Main userId={userId} />
+            <PrivateRoute isAuth={isAuthenticated}>
+              <Header />
+              <Main />
             </PrivateRoute>
           }
         />
-        <Route path="/login" element={<AuthForm onAuthSuccess={onAuthSuccess} />} />
+        <Route path="/login" element={<AuthForm />} />
       </Routes>
     </div>
   );

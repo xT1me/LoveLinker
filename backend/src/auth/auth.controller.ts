@@ -1,31 +1,64 @@
-import { Controller, Post, Body, UseGuards, Request, UnauthorizedException, Get, Req } from '@nestjs/common';
-import { AuthService } from './auth.service';
+import { Controller, Post, Body, Req, UseGuards, Res, Get } from "@nestjs/common";
+import { AuthService } from "./auth.service";
+import { JwtAuthGuard } from "./guards/jwt-auth.guard";
+import { LocalAuthGuard } from "./guards/auth.guard";
 
-import { CreateUserDto } from 'src/users/dto/create-user.dto';
-import { JwtAuthGuard } from './guards/auth.guard';
-import { UsersService } from 'src/users/users.service';
-
-@Controller('auth')
+@Controller("auth")
 export class AuthController {
-  constructor(private readonly authService: AuthService, private readonly usersService: UsersService) {}
+  constructor(private readonly authService: AuthService) {}
 
-
-  @Post('register')
-  async register(@Body() createUserDto: CreateUserDto) {
-    return this.authService.register(createUserDto);
-  }
-  
   @UseGuards(JwtAuthGuard)
   @Get('check')
   async checkAuth(@Req() req) {
-    const userId = req.user.sub;
-    const user = await this.usersService.findOne(userId);
-    return { username: req.user.username, id: req.user.sub, user };
+    const user = req.user; 
+
+    return {
+      status: true,
+      userId: user?.userId,
+    };
+  }
+  
+  @UseGuards(LocalAuthGuard)
+  @Post('login')
+  async login(@Req() req, @Res() res) {
+    const user = req.user._doc || req.user;
+    const tokens = await this.authService.login(user);
+  
+    res.cookie('accessTokenDev', tokens.accessTokenDev, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'Lax',
+      maxAge: 3600000,
+    });
+  
+    res.cookie('refreshTokenDev', tokens.refreshTokenDev, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'Lax',
+      maxAge: 604800000,
+    });
+  
+    const userId = user._id;
+  
+    return res.send({
+      message: 'Login successful',
+      userId,
+    });
+  }
+  
+  @UseGuards(JwtAuthGuard)
+  @Post("refresh")
+  async refresh(@Body("refreshTokenDev") refreshTokenDev: string) {
+    const user = await this.authService.validateRefreshToken(refreshTokenDev);
+    return this.authService.login(user);
   }
 
   @UseGuards(JwtAuthGuard)
-  @Post('profile')
-  async getProfile(@Request() req) {
-    return req.user;
+  @Post('logout')
+  async logout(@Res() res) {
+    res.clearCookie('accessTokenDev', { httpOnly: true, sameSite: 'Lax' });
+    res.clearCookie('refreshTokenDev', { httpOnly: true, sameSite: 'Lax' });
+
+    return res.send({ message: 'Logout successful' });
   }
 }

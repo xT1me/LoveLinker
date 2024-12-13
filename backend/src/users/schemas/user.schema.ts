@@ -21,6 +21,9 @@ export class User extends Document {
   @Prop({ required: true })
   lastName: string;
 
+  @Prop({ type: [String], default: [] }) 
+  roles: string[];
+
   @Prop()
   description: string;
 
@@ -47,3 +50,4 @@ export class User extends Document {
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
+

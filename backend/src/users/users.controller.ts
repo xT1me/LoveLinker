@@ -9,16 +9,17 @@ import {
   UseGuards,
   UseInterceptors,
   UploadedFile,
+  Patch,
 } from '@nestjs/common';
 import { AuthService } from '../auth/auth.service';
 import { UsersService } from './users.service';
-import { JwtAuthGuard } from 'src/auth/guards/auth.guard';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { FavoriteDto } from './dto/favorite.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
+import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 
 @Controller('users')
 export class UsersController {
@@ -50,22 +51,27 @@ export class UsersController {
 
   @Get('list/:id')
   async getAllUsers(@Param('id') id: string) {
-    return this.usersService.findAll(id)
+    return this.usersService.findAllWithoutAdmin(id);
+  }  
+
+  @UseGuards(JwtAuthGuard)
+  @Patch(':id/add-role')
+  async addRole(
+    @Param('id') id: string, 
+    @Body('role') role: string
+  ) {
+    await this.usersService.addRole(id, role);
+    return { message: `Role ${role} added successfully` };
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get(':id')
-  @UseGuards(JwtAuthGuard)
   async getUser(@Param('id') id: string) {
-    return this.usersService.getUserById(id);
+    return this.usersService.findOneById(id);
   }
 
-  @Post('login')
-  async login(@Body() loginDto: { username: string; password: string }) {
-    return this.authService.loginWithCredentials(loginDto);
-  }
-
-  @Put(':id')
   @UseGuards(JwtAuthGuard)
+  @Put(':id')
   @UseInterceptors(
     FileInterceptor('photo', {
       storage: diskStorage({
@@ -84,8 +90,9 @@ export class UsersController {
       },
     }),
   )
-  @Put(':id')
+
   @UseGuards(JwtAuthGuard)
+  @Put(':id')
   async updateUser(
     @Param('id') id: string,
     @Body() updateUserDto: UpdateUserDto,
@@ -93,8 +100,8 @@ export class UsersController {
     return this.usersService.updateUser(id, updateUserDto);
   }
 
-  @Post(':id/favorites')
   @UseGuards(JwtAuthGuard)
+  @Post(':id/favorites')
   async addToFavorites(
     @Param('id') userId: string,
     @Body() favoriteDto: FavoriteDto,
@@ -102,8 +109,8 @@ export class UsersController {
     return this.usersService.addToFavorites(userId, favoriteDto.targetUserId);
   }
 
-  @Delete(':id/favorites/:targetUserId')
   @UseGuards(JwtAuthGuard)
+  @Delete(':id/favorites/:targetUserId')
   async removeFromFavorites(
     @Param('id') userId: string,
     @Param('targetUserId') targetUserId: string,

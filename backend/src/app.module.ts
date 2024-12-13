@@ -1,10 +1,11 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { UsersModule } from './users/users.module';
 import { MessagesModule } from './messages/messages.module';
 import { AuthModule } from './auth/auth.module';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
+import { DefaultDataService } from './default-data/default-data.service';
 
 @Module({
   imports: [
@@ -17,7 +18,7 @@ import { join } from 'path';
     AuthModule,
     UsersModule,
   ],
-  providers: [],
+  providers: [DefaultDataService],
   controllers: [],
 })
 export class AppModule {}

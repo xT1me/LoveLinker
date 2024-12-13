@@ -1,7 +1,9 @@
-import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import * as bcrypt from 'bcrypt';
-import { UsersService } from '../users/users.service';
+import { Injectable, UnauthorizedException } from "@nestjs/common";
+import { JwtService } from "@nestjs/jwt";
+import * as bcrypt from "bcrypt";
+import { CreateUserDto } from "src/users/dto/create-user.dto";
+import { User } from "src/users/schemas/user.schema";
+import { UsersService } from "src/users/users.service";
 
 @Injectable()
 export class AuthService {
@@ -12,55 +14,50 @@ export class AuthService {
 
   async validateUser(username: string, password: string): Promise<any> {
     const user = await this.usersService.findByUsername(username);
+
     if (user && (await bcrypt.compare(password, user.password))) {
-      const { password, ...result } = user.toObject();
+      const { password, ...result } = user;
       return result;
     }
     return null;
   }
 
-  async loginWithCredentials(userDto: { username: string; password: string }) {
-    const { username, password } = userDto;
-    const user = await this.validateUser(username, password);
-
-    if (!user) {
-      throw new UnauthorizedException('Invalid username or password');
-    }
-
-    const userData = await this.usersService.findOne(user._id);
-
-    const payload = { username: user.username, sub: user._id };
-    return {
-      message: 'Login successful',
-      access_token: this.jwtService.sign(payload),
-      userData,
-    };
+  async validateAccessToken(payload: any, token: string): Promise<boolean> {
+    return true;
   }
 
-  async register(userDto: any) {
-    const existingUser = await this.usersService.findByUsername(userDto.username);
-    const existingEmail = await this.usersService.findByEmail(userDto.email);
-
-    if (existingUser) {
-      throw new BadRequestException('Username is already taken');
-    }
-
-    if (existingEmail) {
-      throw new BadRequestException('Email is already taken');
-    }
-
-    const hashedPassword = await bcrypt.hash(userDto.password, 10);
-    const newUser = await this.usersService.create({
-      ...userDto,
-      password: hashedPassword,
+  async login(user: any) {
+    const payload = { userId: user._id, roles: user.roles };
+    
+    const accessTokenDev = this.jwtService.sign(payload, {
+      secret: 'dL8oS1+WZ/pLvEYeMkmO4Z3HYQWhYZ88n2vqQfr2aFB=',
+      expiresIn: '1h',
+    });
+  
+    const refreshTokenDev = this.jwtService.sign(payload, {
+      secret: 'dL8oS1+WZ/pLvEYeMkmO4Z3HYQWhYZ88n2vqQfr2aFB=',
+      expiresIn: '7d',
     });
 
     return {
-      message: 'Registration successful',
-      user: {
-        id: newUser._id,
-        username: newUser.username,
-      },
+      accessTokenDev,
+      refreshTokenDev,
     };
+  }
+  
+
+
+  async validateRefreshToken(refreshTokenDev: string) {
+    try {
+      const payload = this.jwtService.verify(refreshTokenDev);
+      const user = await this.usersService.findOneById(payload.sub);
+      return user;
+    } catch (e) {
+      throw new UnauthorizedException("Invalid refresh token");
+    }
+  }
+
+  async register(createUserDto: CreateUserDto) {
+    return this.usersService.create(createUserDto);
   }
 }

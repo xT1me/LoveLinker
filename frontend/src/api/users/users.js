@@ -1,8 +1,5 @@
 import api from "../api";
 
-export const getToken = () => localStorage.getItem("token");
-
-
 export const getUsersList = async (id) => {
   try {
     const response = await api.get(`/users/list/${id}`);
@@ -10,6 +7,17 @@ export const getUsersList = async (id) => {
   } catch (error) {
     console.error("Error during registration:", error);
     throw error;
+  }
+};
+
+
+export const getUserById = async (id) => {
+  try {
+    const response = await api.get(`/users/${id}`);
+    return response.data;
+  } catch (error) {
+    console.error(`Error fetching user with ID ${id}:`, error);
+    throw error.response ? error.response.data : error.message;
   }
 };
 
